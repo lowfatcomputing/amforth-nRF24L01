@@ -183,22 +183,20 @@ PORTB 5 portpin: _clk   \ output
 \ : nrf24_CRC#!  ;
 \ 0 constant nRF24.RF24_CRC_DISABLED \ nRF24.CONFIG.EN_CRC
 : nrf24_crc_disable 
-    nRF24.CONFIG.EN_CRC invert and
+    12 invert nRF24.CONFIG nrf24_c@ and
     nRF24.CONFIG nrf24_c!
 ;
 
 \ 1 constant nRF24.RF24_CRC_8
 : nrf24_crc_8
-    nrf24_crc_disable
-    nRF24.CONFIG.EN_CRC nrf24_c@ swap 1 swap lshift swap dup or nrf24_c!
+    nrf24_crc_disable drop
+    8 nRF24.CONFIG nrf24_c@ or nrf24_c!
 ;
 
 \ 2 constant nRF24.RF24_CRC_16
 : nrf24_crc_16
-    nrf24_crc_disable
-    nRF24.CONFIG.EN_CRC 1 rot lshift
-    over nrf24_c@ ( CONFIG mask --  )
-    or nrf24_c!
+    12 nRF24.CONFIG nrf24_c@ or
+    nRF24.CONFIG nrf24_c!
 ;
 
 : nrf24_channel! ( channel -- )
@@ -242,34 +240,37 @@ PORTB 5 portpin: _clk   \ output
 
 : +nrf24
     \ Intialize spi for nrf24
-    nrf24_+spi
+    ." Enabling SPI for nRF24L01* " nrf24_+spi cr
 
     \ Set timeout.
-    $4F nRF24.SETUP_RETR nrf24_c! \ ARD = b0100, ARC = b1111
+    ." Setting Timeout... " $4F nRF24.SETUP_RETR nrf24_c! . cr \ ARD = b0100, ARC = b1111
 
     \ Set PA (Power Amplification level)
-    $6 dup invert nRF24.RF_SETUP nrf24_c@ and or nrf24_c! \ PA_MAX
+    ." Setting Power Amplification to MAX... "
+    $6 dup invert nRF24.RF_SETUP nrf24_c@ and or nrf24_c! . cr \ PA_MAX
 
     \ Is this a *-P radio.
-    nrf24_P? if ." *-P radio detected" then
+    nrf24_P? if ." *-P radio detected." else ." Non-P radio detected." then cr
 
     \ Set data-rate to 1MBPS.
 
 
     \ Set CRC length to 16.
-\    nrf24_crc_16
+    ." Setting CRC length to 16... " nrf24_crc_16 . cr
 
     \ Disable dynamic payloads.
-\    0 nRF24.DYNPD nrf24_c!
+    ." Disabling Dynamic Payloads... " 0 nRF24.DYNPD nrf24_c! . cr
 
     \ Reset the status.
-    nRF24.STATUS.RX_DR 1#lshift nRF24.STATUS.TX_DS 1#lshift or nRF24.STATUS.MAX_RT 1#lshift or nRF24.STATUS nrf24_c!
+    ." Resetting status... "
+    nRF24.STATUS.RX_DR 1#lshift nRF24.STATUS.TX_DS 1#lshift
+    or nRF24.STATUS.MAX_RT 1#lshift or nRF24.STATUS nrf24_c! . cr
 
     \ 76 is safe and legal in the USA.
-    76 nrf24_channel! drop
+    ." Setting channel to 76... " 76 nrf24_channel! . cr
 
     \ flush the buffers
-    nrf24_flush_rx drop
-    nrf24_flush_tx drop
+    ." Flushing Rx... " nrf24_flush_rx . cr
+    ." Flushing Tx... " nrf24_flush_tx . cr
 ;
 
