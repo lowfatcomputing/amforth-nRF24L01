@@ -141,14 +141,24 @@ PORTB 5 portpin: _clk   \ output
     _csn high
 ;
 
-\ : nrf24_c! ( value reg -- status )
-\     (nrf24_c!@) swap drop
-\ ;
-\ 
-\ : nrf24_c@ ( reg -- cmd_resp b )
-\     $FF swap (nrf24_c!@)
-\ ;
+: nrf24_data_rate@
+;
 
+: nrf24_250Kbps!data_rate
+    nRF24.reg.RF_SETUP nrf24_c@
+    1 nRF24.RF_DR_LOW lshift 1 nRF24.RF_DR_LOW lshift or and dup
+    nRF24.reg.RF_SETUP nrf24_c!
+
+    nRF24.reg.RF_SETUP nrf24_c@ = ( setup -- false=0|true=1 ) \ Do we get back what we stored.
+;
+
+: nrf24_P?
+    nRF24.reg.RF_SETUP nrf24_c@
+    \ Try setting radio to 250KBPS keep return value
+    \ from nrf24_data_rate! as our answer.
+    nrf24_250Kbps!data_rate
+    swap nRF24.reg.RF_SETUP nrf24_c!
+;
 
 \ enable spi for nRF24 set I/O
 : nrf24_+spi ( -- )
@@ -178,11 +188,13 @@ PORTB 5 portpin: _clk   \ output
     nrf24_+spi
 
     \ Set timeout.
-    $4F nRF24.regs.SETUP_RETR nrf24_c! \ ARD = b0100, ARC = b1111
+    $4F nRF24.reg.SETUP_RETR nrf24_c! \ ARD = b0100, ARC = b1111
 
     \ Set PA (Power Amplification level)
-    $6 dup invert nRF24.regs.RF_SETUP nrf24_c@ and or nrf24_c! \ PA_MAX
+    $6 dup invert nRF24.reg.RF_SETUP nrf24_c@ and or nrf24_c! \ PA_MAX
 
+    \ Is this a *-P radio.
+    nrf24_P? if ." *-P radio detected" then
 
 ;
 
