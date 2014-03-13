@@ -1,5 +1,6 @@
 \ nRF24L01* family of radios: A WIP library for amforth.
 \ GPLv2
+\ TODO eliminate .reg from names
 
 rf24-empty
 marker rf24-empty
@@ -160,6 +161,27 @@ PORTB 5 portpin: _clk   \ output
     swap nRF24.reg.RF_SETUP nrf24_c!
 ;
 
+: nrf24_CRC#!
+    
+;
+
+: nrf24_channel! ( channel -- )
+    127 min nRF24.reg.RF_CH nrf24_c!
+;
+
+: nrf24_flush_rx
+    _csn low
+    FLUSH_TX c!@spi
+    _csn high
+;
+
+: nrf24_flush_tx
+    _csn low
+    FLUSH_RX c!@spi
+    _csn high
+;
+
+
 \ enable spi for nRF24 set I/O
 : nrf24_+spi ( -- )
     _irq pin_input
@@ -196,5 +218,23 @@ PORTB 5 portpin: _clk   \ output
     \ Is this a *-P radio.
     nrf24_P? if ." *-P radio detected" then
 
+    \ Set data-rate to 1MBPS.
+
+
+    \ Set CRC length to 16.
+
+
+    \ Disable dynamic payloads.
+    0 nRF24.reg.DYNPD nrf24_c!
+
+    \ Reset the status.
+    1 nRF24.reg.STATUS.RX_DR lshift 1 nRF24.reg.STATUS.TX_DS lshift or 1 nRF24.reg.STATUS.MAX_RT lshift or nRF24.reg.STATUS nrf24_c!
+
+    \ 76 is safe and legal in the USA.
+    76 nrf24_channel!
+
+    \ flush the buffers
+    nrf24_flush_rx
+    nrf24_flush_tx
 ;
 
