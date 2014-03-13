@@ -1,6 +1,5 @@
 \ nRF24L01* family of radios: A WIP library for amforth.
 \ GPLv2
-\ TODO eliminate .reg from names
 
 rf24-empty
 marker rf24-empty
@@ -123,6 +122,10 @@ PORTB 3 portpin: _mosi  \ output
 PORTB 4 portpin: _miso  \ input
 PORTB 5 portpin: _clk   \ output
 
+: 1#lshift
+    1 swap lshift
+;
+
 : nrf24_c! ( value portaddr -- status )
     _csn low
     nRF24.REGISTER_MASK and ( value reg mask -- value n )
@@ -141,8 +144,9 @@ PORTB 5 portpin: _clk   \ output
     _csn high
 ;
 
-: 1#lshift
-    1 swap lshift
+\ Clear bit# in port.
+: nrf24_and! ( bit# port -- )
+    dup nrf24_c@ rot and swap \ nrf24_c!
 ;
 
 \ Set bit# in port.
@@ -154,9 +158,24 @@ PORTB 5 portpin: _clk   \ output
     swap \ nrf24_c!
 ;
 
-\ Clear bit# in port.
-: nrf24_and! ( bit# port -- )
-    dup nrf24_c@ rot and swap \ nrf24_c!
+\ multi-character store
+: nrf24! ( addr +n1 register -- status )
+    _csn low
+    nRF24.REGISTER_MASK and ( value reg mask -- value n )
+    nRF24.W_REGISTER or ( value n W_REGISTER )
+    c!@spi swap ( value cmd -- value resp )
+    0 do c!spi + loop \ FIXME
+    _csn high
+;
+
+\ write-multiple
+: nrf24@ ( addr +n1 register -- status )
+    _csn low
+    nRF24.REGISTER_MASK and ( value reg mask -- value n )
+    nRF24.R_REGISTER or ( value n W_REGISTER )
+    c!@spi drop ( value cmd -- value resp )
+    nRF24.NOP c!@spi \ FIXME
+    _csn high
 ;
 
 
@@ -273,4 +292,30 @@ PORTB 5 portpin: _clk   \ output
     ." Flushing Rx... " nrf24_flush_rx . cr
     ." Flushing Tx... " nrf24_flush_tx . cr
 ;
+
+\ Start listening
+: +nrf24_listen
+    nRF24.CONFIG nrf24_c@ nRF24.CONFIG.PWR_UP 1#lshift nRF24.CONFIG.PRIM_RX 1#lshift or over or nrf24_c!
+    nRF24.STATUS nrf24_c@ nRF24.STATUS.RX_DR 1#lshift nRF24.STATUS.TX_DS 1#lshift or nRF24.STATUS.MAX_RT 1#lshift or over nrf24_c!
+
+    \ Restore pipe0 address, if it exists.
+
+    \ Flush buffers
+    nrf24_flush_rx
+    nrf24_flush_tx
+
+    \ Start
+    _ce high
+
+    \ Wait for radio
+    130 ms
+;
+
+\ Stop listening
+: -nrf24_listen
+    _ce low
+    nrf24_flush_tx
+    nrf24_flush_rx
+;
+
 
